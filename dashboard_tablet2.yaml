@@ -1,0 +1,654 @@
+# Familienplaner Teil 1 – Dashboard fürs zweite Tablet · Homelab für Normalos
+# Einfügen: Dashboard → Dashboard bearbeiten → Menü → Raw-Konfigurationseditor
+# Namen anpassen: Suchen & Ersetzen Mia/mia, Leo/leo, Mama/mama, Papa/papa
+title: Familienplaner Tablet 2
+kiosk_mode: {}
+views:
+- title: Heute
+  path: heute
+  icon: mdi:home-heart
+  theme: Familienplaner
+  type: custom:grid-layout
+  layout:
+    grid-template-columns: 340px minmax(0, 1fr) 330px
+    grid-template-rows: auto auto auto minmax(0, 1fr)
+    grid-template-areas: '"clock agenda shop" "weather agenda shop" "glance agenda todo" "glance agenda todo"'
+    grid-gap: 12px
+    margin: '0'
+    padding: 12px 12px 12px 0
+    height: calc(100vh - 24px)
+  cards:
+  - type: markdown
+    content: |-
+      # {{ now().strftime('%H:%M') }}
+      {% set wd = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'] %}{% set mo = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'] %}## {{ wd[now().weekday()] }}, {{ now().day }}. {{ mo[now().month-1] }}
+    card_mod:
+      style:
+        .: 'ha-card { padding: 4px 8px 0; background: transparent; }'
+        ha-markdown$: 'h1 { font-size: 72px !important; font-weight: 300 !important; line-height: 1 !important; margin: 0 !important; letter-spacing: -2px; } h2 { font-size: 20px !important; font-weight: 500 !important; margin: 6px 0 0 !important; color: var(--secondary-text-color); }'
+    view_layout:
+      grid-area: clock
+  - type: weather-forecast
+    entity: weather.forecast_home
+    forecast_type: daily
+    show_current: true
+    show_forecast: true
+    forecast_slots: 4
+    name: ' '
+    card_mod:
+      style: '.state { font-size: 18px !important; white-space: normal !important; overflow: visible !important; line-height: 1.2; } .name { display: none; }'
+    view_layout:
+      grid-area: weather
+  - type: markdown
+    content: |-
+      {% set heute = now().date() %}{% macro tage(d) %}{% set n = (d - heute).days %}{{ 'heute' if n <= 0 else 'morgen' if n == 1 else 'in ' ~ n ~ ' Tagen' }}{% endmacro %}{% set ns = namespace(t=none, m='', who='') %}{% for e, n in [('calendar.familie','Familie'),('calendar.mama','Mama'),('calendar.papa','Papa'),('calendar.mia','Mia'),('calendar.leo','Leo')] %}{% set s = state_attr(e,'start_time') %}{% if s and (ns.t is none or as_datetime(s) < ns.t) %}{% set ns.t = as_datetime(s) %}{% set ns.m = (state_attr(e,'message') or '') | trim %}{% set ns.who = n %}{% endif %}{% endfor %}<ha-icon icon="mdi:calendar-star"></ha-icon> {% if ns.t %}**{{ ns.m }}** · {{ ns.who }}, {{ tage(ns.t.date()) }}{% else %}Keine Termine geplant{% endif %}
+
+      {% set fs = state_attr('calendar.schulferien','start_time') %}{% set fm = (state_attr('calendar.schulferien','message') or '') | regex_replace(' \d{4}', '') | trim %}<ha-icon icon="mdi:beach" style="color:#FFD54F"></ha-icon> {% if is_state('calendar.schulferien','on') %}**{{ fm }}** – bis {{ as_datetime(state_attr('calendar.schulferien','end_time')).strftime('%d.%m.') }}{% elif fs %}**{{ fm }}** {{ tage(as_datetime(fs).date()) }}{% else %}Keine Ferien geplant{% endif %}
+
+      {% set es = state_attr('calendar.essensplan','start_time') %}<ha-icon icon="mdi:silverware-fork-knife" style="color:#81C784"></ha-icon> {% if es and as_datetime(es).date() == heute %}Heute: **{{ (state_attr('calendar.essensplan','message') or '') | trim }}**{% elif es %}{{ state_attr('calendar.essensplan','message') }} {{ tage(as_datetime(es).date()) }}{% else %}Noch kein Essen geplant{% endif %}
+    card_mod:
+      style:
+        .: 'ha-card { padding: 4px 12px; height: 100%; box-sizing: border-box; }'
+        ha-markdown$: 'p { font-size: 17px !important; margin: 8px 0 !important; line-height: 1.3; } ha-icon { --mdc-icon-size: 26px; margin-right: 10px; vertical-align: -6px; } p:nth-of-type(1) ha-icon { color: #4FB3A9; } p:nth-of-type(2) ha-icon { color: #FFD54F; } p:nth-of-type(3) ha-icon { color: #A1887F; } p:nth-of-type(4) ha-icon { color: #81C784; }'
+    view_layout:
+      grid-area: glance
+  - type: custom:calendar-card-pro
+    title: Termine
+    title_font_size: 22px
+    entities:
+    - entity: calendar.familie
+      color: var(--primary-text-color)
+      accent_color: '#4FB3A9'
+      label: mdi:home-heart
+    - entity: calendar.mama
+      color: var(--primary-text-color)
+      accent_color: '#F06292'
+      label: mdi:account-heart
+    - entity: calendar.papa
+      color: var(--primary-text-color)
+      accent_color: '#5C9DFF'
+      label: mdi:account-tie
+    - entity: calendar.mia
+      color: var(--primary-text-color)
+      accent_color: '#B388FF'
+      label: mdi:star-face
+    - entity: calendar.leo
+      color: var(--primary-text-color)
+      accent_color: '#FFB74D'
+      label: mdi:school
+    - entity: calendar.essensplan
+      color: var(--primary-text-color)
+      accent_color: '#81C784'
+      label: mdi:silverware-fork-knife
+    days_to_show: 14
+    show_empty_days: false
+    empty_day_text: –
+    language: de
+    show_past_events: true
+    filter_duplicates: true
+    today_indicator: dot
+    today_indicator_color: '#4FB3A9'
+    weekday_font_size: 14px
+    day_font_size: 30px
+    month_font_size: 13px
+    event_font_size: 18px
+    time_font_size: 14px
+    location_font_size: 13px
+    time_icon_size: 14px
+    location_icon_size: 14px
+    vertical_line_width: 4px
+    event_background_opacity: 12
+    day_spacing: 14px
+    event_spacing: 6px
+    day_separator_width: 1px
+    day_separator_color: var(--divider-color)
+    show_location: true
+    show_end_time: true
+    time_24h: true
+    accent_color: '#4FB3A9'
+    weather:
+      entity: weather.forecast_home
+      position: date
+      date:
+        show_conditions: true
+        show_high_temp: true
+        show_low_temp: true
+        icon_size: 18px
+        font_size: 13px
+    card_mod:
+      style: 'ha-card { height: calc(100vh - 24px); overflow-y: auto; scrollbar-width: none; }'
+    view_layout:
+      grid-area: agenda
+    event_tap_action:
+      action: details
+  - type: todo-list
+    entity: todo.einkaufsliste
+    title: Einkaufsliste
+    hide_completed: false
+    display_order: duedate_asc
+    card_mod:
+      style:
+        .: 'ha-card { height: 100%; overflow-y: auto; scrollbar-width: none; border-top: 6px solid #81C784; box-sizing: border-box; } ha-checkbox { --mdc-checkbox-unchecked-color: #81C784; --mdc-theme-secondary: #81C784; } ha-input, ha-textfield { min-width: 0 !important; flex: 1 1 0 !important; width: auto !important; }'
+        ha-card$: '.card-header { font-size: 22px !important; padding-bottom: 4px !important; }'
+    view_layout:
+      grid-area: shop
+  - type: todo-list
+    entity: todo.familien_to_dos
+    title: Familien-To-dos
+    hide_completed: false
+    display_order: duedate_asc
+    card_mod:
+      style:
+        .: 'ha-card { height: 100%; overflow-y: auto; scrollbar-width: none; border-top: 6px solid #4FB3A9; box-sizing: border-box; } ha-checkbox { --mdc-checkbox-unchecked-color: #4FB3A9; --mdc-theme-secondary: #4FB3A9; } ha-input, ha-textfield { min-width: 0 !important; flex: 1 1 0 !important; width: auto !important; }'
+        ha-card$: '.card-header { font-size: 22px !important; padding-bottom: 4px !important; }'
+    view_layout:
+      grid-area: todo
+- title: Kalender
+  path: woche
+  icon: mdi:calendar-week
+  theme: Familienplaner
+  type: custom:grid-layout
+  layout:
+    grid-template-columns: minmax(0, 1fr)
+    grid-template-rows: auto minmax(0, 1fr)
+    grid-template-areas: '"top" "main"'
+    grid-gap: 12px
+    margin: '0'
+    padding: 12px 12px 12px 0
+    height: calc(100vh - 24px)
+  cards:
+  - type: custom:mushroom-chips-card
+    alignment: start
+    chips:
+    - type: template
+      icon: mdi:calendar-week
+      content: Woche
+      icon_color: teal
+      tap_action:
+        action: none
+    - type: template
+      icon: mdi:calendar-month
+      content: Monat
+      icon_color: grey
+      tap_action:
+        action: navigate
+        navigation_path: /familienplaner-tablet2/monat?hide_header
+    card_mod:
+      style: 'ha-card { --chip-height: 40px; --chip-font-size: 15px; --chip-icon-size: 20px; --chip-spacing: 10px; --chip-padding: 0 16px; }'
+    view_layout:
+      grid-area: top
+  - type: custom:week-planner-card
+    calendars:
+    - entity: calendar.familie
+      name: Familie
+      color: '#4FB3A9'
+    - entity: calendar.mama
+      name: Mama
+      color: '#F06292'
+    - entity: calendar.papa
+      name: Papa
+      color: '#5C9DFF'
+    - entity: calendar.mia
+      name: Mia
+      color: '#B388FF'
+    - entity: calendar.leo
+      name: Leo
+      color: '#FFB74D'
+    - entity: calendar.essensplan
+      name: Essen
+      color: '#81C784'
+    days: 7
+    startingDay: today
+    locale: de
+    columns:
+      extraLarge: 7
+      large: 7
+      medium: 7
+      small: 7
+      extraSmall: 7
+    showLocation: true
+    hidePastEvents: false
+    combineSimilarEvents: true
+    showLegend: true
+    legendToggle: true
+    navigation: true
+    texts:
+      today: Heute
+      tomorrow: Morgen
+      yesterday: Gestern
+      noEvents: –
+      fullDay: Ganztägig
+    weather:
+      entity: weather.forecast_home
+      showCondition: true
+      showTemperature: true
+      showLowTemperature: false
+    view_layout:
+      grid-area: main
+    card_mod:
+      style: 'ha-card { height: 100%; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; box-sizing: border-box; padding: 8px 4px; }'
+- title: Aufgaben
+  path: aufgaben
+  icon: mdi:broom
+  theme: Familienplaner
+  type: custom:grid-layout
+  layout:
+    grid-template-columns: repeat(4, minmax(0, 1fr))
+    grid-template-rows: 44px minmax(0, 1fr)
+    grid-template-areas: '"bar bar bar bar" "p1 p2 p3 p4"'
+    grid-gap: 12px
+    margin: '0'
+    padding: 12px 12px 12px 0
+    height: calc(100vh - 24px)
+  cards:
+  - type: custom:mushroom-chips-card
+    alignment: start
+    chips:
+    - type: conditional
+      conditions:
+      - entity: input_text.familienplaner2_status
+        state_not: ''
+      - entity: input_text.familienplaner2_status
+        state_not: unknown
+      chip:
+        type: template
+        icon: mdi:information-outline
+        icon_color: amber
+        content: '{{ states(''input_text.familienplaner2_status'') }}'
+        tap_action:
+          action: none
+    card_mod:
+      style: 'ha-card { --chip-height: 44px; --chip-font-size: 15px; --chip-icon-size: 20px; --chip-spacing: 10px; --chip-padding: 0 16px; }'
+    view_layout:
+      grid-area: bar
+  - type: todo-list
+    entity: todo.aufgaben_papa
+    title: Papa
+    hide_completed: false
+    display_order: duedate_asc
+    card_mod:
+      style:
+        .: 'ha-card { height: calc(100vh - 80px); overflow-y: auto; scrollbar-width: none; border-top: 6px solid #5C9DFF; box-sizing: border-box; } ha-checkbox { --mdc-checkbox-unchecked-color: #5C9DFF; --mdc-theme-secondary: #5C9DFF; } ha-input, ha-textfield { min-width: 0 !important; flex: 1 1 0 !important; width: auto !important; }'
+        ha-card$: '.card-header { font-size: 22px !important; padding-bottom: 4px !important; }'
+    view_layout:
+      grid-area: p1
+  - type: todo-list
+    entity: todo.aufgaben_mama
+    title: Mama
+    hide_completed: false
+    display_order: duedate_asc
+    card_mod:
+      style:
+        .: 'ha-card { height: calc(100vh - 80px); overflow-y: auto; scrollbar-width: none; border-top: 6px solid #F06292; box-sizing: border-box; } ha-checkbox { --mdc-checkbox-unchecked-color: #F06292; --mdc-theme-secondary: #F06292; } ha-input, ha-textfield { min-width: 0 !important; flex: 1 1 0 !important; width: auto !important; }'
+        ha-card$: '.card-header { font-size: 22px !important; padding-bottom: 4px !important; }'
+    view_layout:
+      grid-area: p2
+  - type: todo-list
+    entity: todo.aufgaben_mia
+    title: Mia
+    hide_completed: false
+    display_order: duedate_asc
+    card_mod:
+      style:
+        .: 'ha-card { height: calc(100vh - 80px); overflow-y: auto; scrollbar-width: none; border-top: 6px solid #B388FF; box-sizing: border-box; } ha-checkbox { --mdc-checkbox-unchecked-color: #B388FF; --mdc-theme-secondary: #B388FF; } ha-input, ha-textfield { min-width: 0 !important; flex: 1 1 0 !important; width: auto !important; }'
+        ha-card$: '.card-header { font-size: 22px !important; padding-bottom: 4px !important; }'
+    view_layout:
+      grid-area: p3
+  - type: todo-list
+    entity: todo.aufgaben_leo
+    title: Leo
+    hide_completed: false
+    display_order: duedate_asc
+    card_mod:
+      style:
+        .: 'ha-card { height: calc(100vh - 80px); overflow-y: auto; scrollbar-width: none; border-top: 6px solid #FFB74D; box-sizing: border-box; } ha-checkbox { --mdc-checkbox-unchecked-color: #FFB74D; --mdc-theme-secondary: #FFB74D; } ha-input, ha-textfield { min-width: 0 !important; flex: 1 1 0 !important; width: auto !important; }'
+        ha-card$: '.card-header { font-size: 22px !important; padding-bottom: 4px !important; }'
+    view_layout:
+      grid-area: p4
+- title: Essen
+  path: essen
+  icon: mdi:silverware-fork-knife
+  theme: Familienplaner
+  type: custom:grid-layout
+  layout:
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr)
+    grid-template-rows: minmax(0, 1fr) 44px
+    grid-template-areas: '"plan todo shop" "plan todo shopbar"'
+    grid-gap: 12px
+    margin: '0'
+    padding: 12px 12px 12px 0
+    height: calc(100vh - 24px)
+  cards:
+  - type: custom:calendar-card-pro
+    title: Essensplan
+    title_font_size: 22px
+    entities:
+    - entity: calendar.essensplan
+      color: var(--primary-text-color)
+      accent_color: '#81C784'
+      label: mdi:silverware-fork-knife
+    days_to_show: 7
+    show_empty_days: true
+    empty_day_text: –
+    language: de
+    show_past_events: true
+    filter_duplicates: true
+    today_indicator: dot
+    today_indicator_color: '#4FB3A9'
+    weekday_font_size: 14px
+    day_font_size: 30px
+    month_font_size: 13px
+    event_font_size: 18px
+    time_font_size: 14px
+    location_font_size: 13px
+    time_icon_size: 14px
+    location_icon_size: 14px
+    vertical_line_width: 4px
+    event_background_opacity: 12
+    day_spacing: 14px
+    event_spacing: 6px
+    day_separator_width: 1px
+    day_separator_color: var(--divider-color)
+    show_location: true
+    show_end_time: true
+    time_24h: true
+    accent_color: '#81C784'
+    weather:
+      entity: weather.forecast_home
+      position: date
+      date:
+        show_conditions: true
+        show_high_temp: true
+        show_low_temp: true
+        icon_size: 18px
+        font_size: 13px
+    card_mod:
+      style: 'ha-card { height: calc(100vh - 24px); overflow-y: auto; scrollbar-width: none; }'
+    view_layout:
+      grid-area: plan
+    event_tap_action:
+      action: details
+  - type: todo-list
+    entity: todo.einkaufsliste
+    title: Einkaufsliste
+    hide_completed: false
+    display_order: duedate_asc
+    card_mod:
+      style:
+        .: 'ha-card { height: calc(100vh - 80px); overflow-y: auto; scrollbar-width: none; border-top: 6px solid #81C784; box-sizing: border-box; } ha-checkbox { --mdc-checkbox-unchecked-color: #81C784; --mdc-theme-secondary: #81C784; } ha-input, ha-textfield { min-width: 0 !important; flex: 1 1 0 !important; width: auto !important; }'
+        ha-card$: '.card-header { font-size: 22px !important; padding-bottom: 4px !important; }'
+    view_layout:
+      grid-area: shop
+  - type: vertical-stack
+    cards:
+    - type: vertical-stack
+      cards:
+      - type: heading
+        heading: Essen eintragen
+        icon: mdi:pot-steam
+        heading_style: title
+        card_mod:
+          style: 'ha-card { --mdc-icon-size: 26px; padding: 4px 4px 0; } ha-state-icon, ha-icon { color: #81C784; }'
+      - type: entities
+        card_mod:
+          style: 'ha-card { padding: 4px 0; } :host { --mdc-typography-body1-font-size: 17px; }'
+        entities:
+        - entity: input_datetime.familienplaner2_essen_datum
+          name: ' '
+        - entity: input_select.familienplaner2_essen_mahlzeit
+          name: Mahlzeit
+        - entity: input_text.familienplaner2_essen_gericht
+          name: Gericht
+      - type: button
+        name: Essen eintragen
+        icon: mdi:pot-steam
+        show_name: true
+        show_icon: false
+        tap_action:
+          action: perform-action
+          perform_action: script.familienplaner2_essen_speichern
+        card_mod:
+          style: 'ha-card { background: #81C784; border-radius: 16px; padding: 14px 0 !important; flex-direction: row !important; justify-content: center !important; gap: 12px; } ha-card span { font-size: 18px; font-weight: 600; color: #10151a; width: auto !important; flex: 0 0 auto !important; } ha-state-icon { color: #10151a !important; }'
+      - type: markdown
+        content: Nach dem Speichern springt der Tag automatisch weiter – so ist die ganze Woche schnell geplant.
+        card_mod:
+          style:
+            .: 'ha-card { background: transparent; }'
+            ha-markdown$: 'p { font-size: 14px !important; color: var(--secondary-text-color); }'
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: input_text.familienplaner2_status
+        state_not:
+        - ''
+        - unknown
+        - unavailable
+      card:
+        type: markdown
+        content: '{{ states(''input_text.familienplaner2_status'') }}'
+        card_mod:
+          style:
+            .: 'ha-card { background: var(--fz-active); }'
+            ha-markdown$: 'p { font-size: 16px !important; margin: 0 !important; }'
+    view_layout:
+      grid-area: todo
+- title: Eintragen
+  path: eintragen
+  icon: mdi:plus-circle
+  theme: Familienplaner
+  type: custom:grid-layout
+  layout:
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr)
+    grid-template-rows: 100%
+    grid-template-areas: '"termin vorschau"'
+    grid-gap: 12px
+    margin: '0'
+    padding: 12px 12px 12px 0
+    height: calc(100vh - 24px)
+  cards:
+  - type: vertical-stack
+    cards:
+    - type: vertical-stack
+      cards:
+      - type: heading
+        heading: Neuer Termin
+        icon: mdi:calendar-plus
+        heading_style: title
+        card_mod:
+          style: 'ha-card { --mdc-icon-size: 26px; padding: 4px 4px 0; } ha-state-icon, ha-icon { color: var(--primary-color); }'
+      - type: entities
+        state_color: true
+        card_mod:
+          style: 'ha-card { padding: 4px 0; } :host { --mdc-typography-body1-font-size: 17px; }'
+        entities:
+        - entity: input_select.familienplaner2_termin_kalender
+          name: Für
+        - entity: input_text.familienplaner2_termin_titel
+          name: Was?
+        - entity: input_datetime.familienplaner2_termin_datum
+          name: Datum
+        - entity: input_boolean.familienplaner2_termin_ganztaegig
+          name: Ganztägig
+        - type: conditional
+          conditions:
+          - entity: input_boolean.familienplaner2_termin_ganztaegig
+            state: 'off'
+          row:
+            entity: input_datetime.familienplaner2_termin_von
+            name: Beginn
+        - type: conditional
+          conditions:
+          - entity: input_boolean.familienplaner2_termin_ganztaegig
+            state: 'off'
+          row:
+            entity: input_datetime.familienplaner2_termin_bis
+            name: Ende
+        - entity: input_text.familienplaner2_termin_ort
+          name: Ort (optional)
+      - type: button
+        name: Termin speichern
+        icon: mdi:calendar-check
+        show_name: true
+        show_icon: false
+        tap_action:
+          action: perform-action
+          perform_action: script.familienplaner2_termin_speichern
+        card_mod:
+          style: 'ha-card { background: #4FB3A9; border-radius: 16px; padding: 14px 0 !important; flex-direction: row !important; justify-content: center !important; gap: 12px; } ha-card span { font-size: 18px; font-weight: 600; color: #10151a; width: auto !important; flex: 0 0 auto !important; } ha-state-icon { color: #10151a !important; }'
+    - type: conditional
+      conditions:
+      - condition: state
+        entity: input_text.familienplaner2_status
+        state_not:
+        - ''
+        - unknown
+        - unavailable
+      card:
+        type: markdown
+        content: '{{ states(''input_text.familienplaner2_status'') }}'
+        card_mod:
+          style:
+            .: 'ha-card { background: var(--fz-active); }'
+            ha-markdown$: 'p { font-size: 16px !important; margin: 0 !important; }'
+    - type: markdown
+      content: <ha-icon icon="mdi:gesture-tap"></ha-icon> **Ändern oder löschen:** unter *Kalender* einfach auf den Eintrag tippen.
+      card_mod:
+        style:
+          .: 'ha-card { background: transparent; }'
+          ha-markdown$: 'p { font-size: 14px !important; color: var(--secondary-text-color); } ha-icon { --mdc-icon-size: 18px; vertical-align: -3px; }'
+    - type: custom:mushroom-template-card
+      primary: Essen eintragen?
+      secondary: Das geht jetzt auf der Seite „Essen“
+      icon: mdi:silverware-fork-knife
+      icon_color: green
+      multiline_secondary: true
+      fill_container: true
+      badge_icon: mdi:chevron-right
+      badge_color: grey
+      tap_action:
+        action: navigate
+        navigation_path: /familienplaner-tablet2/essen?hide_header
+      card_mod:
+        style: 'ha-card { padding: 10px 14px !important; } ha-tile-icon { --tile-icon-size: 48px; --mdc-icon-size: 28px; } ha-tile-info { --ha-tile-info-primary-font-size: 18px; --ha-tile-info-primary-line-height: 24px; --ha-tile-info-secondary-font-size: 14px; --ha-tile-info-secondary-line-height: 19px; }'
+    view_layout:
+      grid-area: termin
+  - type: custom:calendar-card-pro
+    title: Kommende Einträge
+    title_font_size: 22px
+    entities:
+    - entity: calendar.familie
+      color: var(--primary-text-color)
+      accent_color: '#4FB3A9'
+      label: mdi:home-heart
+    - entity: calendar.mama
+      color: var(--primary-text-color)
+      accent_color: '#F06292'
+      label: mdi:account-heart
+    - entity: calendar.papa
+      color: var(--primary-text-color)
+      accent_color: '#5C9DFF'
+      label: mdi:account-tie
+    - entity: calendar.mia
+      color: var(--primary-text-color)
+      accent_color: '#B388FF'
+      label: mdi:star-face
+    - entity: calendar.leo
+      color: var(--primary-text-color)
+      accent_color: '#FFB74D'
+      label: mdi:school
+    - entity: calendar.essensplan
+      color: var(--primary-text-color)
+      accent_color: '#81C784'
+      label: mdi:silverware-fork-knife
+    days_to_show: 14
+    show_empty_days: false
+    empty_day_text: –
+    language: de
+    show_past_events: true
+    filter_duplicates: true
+    today_indicator: dot
+    today_indicator_color: '#4FB3A9'
+    weekday_font_size: 14px
+    day_font_size: 30px
+    month_font_size: 13px
+    event_font_size: 18px
+    time_font_size: 14px
+    location_font_size: 13px
+    time_icon_size: 14px
+    location_icon_size: 14px
+    vertical_line_width: 4px
+    event_background_opacity: 12
+    day_spacing: 14px
+    event_spacing: 6px
+    day_separator_width: 1px
+    day_separator_color: var(--divider-color)
+    show_location: true
+    show_end_time: true
+    time_24h: true
+    accent_color: '#4FB3A9'
+    weather:
+      entity: weather.forecast_home
+      position: date
+      date:
+        show_conditions: true
+        show_high_temp: true
+        show_low_temp: true
+        icon_size: 18px
+        font_size: 13px
+    card_mod:
+      style: 'ha-card { height: calc(100vh - 24px); overflow-y: auto; scrollbar-width: none; }'
+    view_layout:
+      grid-area: vorschau
+    event_tap_action:
+      action: details
+- title: Kalender
+  path: monat
+  icon: mdi:calendar-month
+  theme: Familienplaner
+  type: custom:grid-layout
+  layout:
+    grid-template-columns: minmax(0, 1fr)
+    grid-template-rows: auto minmax(0, 1fr)
+    grid-template-areas: '"top" "main"'
+    grid-gap: 12px
+    margin: '0'
+    padding: 12px 12px 12px 0
+    height: calc(100vh - 24px)
+  cards:
+  - type: custom:mushroom-chips-card
+    alignment: start
+    chips:
+    - type: template
+      icon: mdi:calendar-week
+      content: Woche
+      icon_color: grey
+      tap_action:
+        action: navigate
+        navigation_path: /familienplaner-tablet2/woche?hide_header
+    - type: template
+      icon: mdi:calendar-month
+      content: Monat
+      icon_color: teal
+      tap_action:
+        action: none
+    card_mod:
+      style: 'ha-card { --chip-height: 40px; --chip-font-size: 15px; --chip-icon-size: 20px; --chip-spacing: 10px; --chip-padding: 0 16px; }'
+    view_layout:
+      grid-area: top
+  - type: calendar
+    initial_view: dayGridMonth
+    entities:
+    - calendar.familie
+    - calendar.mama
+    - calendar.papa
+    - calendar.mia
+    - calendar.leo
+    - calendar.essensplan
+    view_layout:
+      grid-area: main
+    card_mod:
+      style:
+        .: 'ha-card { height: 100%; overflow: hidden; box-sizing: border-box; }'
+        ha-full-calendar$: '#calendar { height: calc(100vh - 120px) !important; } .fc { height: 100% !important; } .fc-event-title, .fc-event-time { font-size: 14px; }'
+  subview: true
+  back_path: /familienplaner-tablet2/woche?hide_header

@@ -1,0 +1,207 @@
+# ==============================================================================
+# Familienplaner – Teil 1: Eingabe am Tablet (Termine & Essensplan)
+# Homelab für Normalos · github: siehe Videobeschreibung
+# ==============================================================================
+
+input_text:
+  familienplaner_termin_titel:
+    name: Titel
+    icon: mdi:pencil
+    max: 120
+  familienplaner_termin_ort:
+    name: Ort (optional)
+    icon: mdi:map-marker
+    max: 120
+  familienplaner_essen_gericht:
+    name: Gericht
+    icon: mdi:pot-steam
+    max: 120
+  familienplaner_status:
+    name: Status
+    icon: mdi:information-outline
+    max: 255
+
+input_select:
+  familienplaner_termin_kalender:
+    name: Für
+    icon: mdi:account-group
+    options:
+      - Familie
+      - Mama
+      - Papa
+      - Mia
+      - Leo
+  familienplaner_essen_mahlzeit:
+    name: Mahlzeit
+    icon: mdi:silverware-fork-knife
+    options:
+      - Abendessen
+      - Mittagessen
+      - Frühstück
+
+input_boolean:
+  familienplaner_termin_ganztaegig:
+    name: Ganztägig
+    icon: mdi:calendar-today
+
+input_datetime:
+  familienplaner_termin_datum:
+    name: Datum
+    has_date: true
+    has_time: false
+  familienplaner_termin_von:
+    name: Beginn
+    has_date: false
+    has_time: true
+  familienplaner_termin_bis:
+    name: Ende
+    has_date: false
+    has_time: true
+  familienplaner_essen_datum:
+    name: Tag
+    has_date: true
+    has_time: false
+
+script:
+  familienplaner_termin_speichern:
+    alias: Familienplaner – Termin speichern
+    icon: mdi:calendar-check
+    mode: single
+    sequence:
+      # kurz warten, bis das zuletzt getippte Textfeld am Tablet uebernommen ist
+      - delay: "00:00:00.700"
+      - variables:
+          kalender: >
+            {{ {'Familie': 'calendar.familie', 'Mama': 'calendar.mama', 'Papa': 'calendar.papa', 'Mia': 'calendar.mia', 'Leo': 'calendar.leo'}
+               .get(states('input_select.familienplaner_termin_kalender'), 'calendar.familie') }}
+          titel: "{{ states('input_text.familienplaner_termin_titel') | trim }}"
+          ort: "{{ states('input_text.familienplaner_termin_ort') | trim }}"
+          datum: "{{ states('input_datetime.familienplaner_termin_datum') }}"
+          ganztags: "{{ is_state('input_boolean.familienplaner_termin_ganztaegig', 'on') }}"
+          von: "{{ states('input_datetime.familienplaner_termin_von')[:5] }}"
+          bis: >
+            {% set b = states('input_datetime.familienplaner_termin_bis')[:5] %}
+            {{ b if b > von else (today_at(von) + timedelta(hours=1)).strftime('%H:%M') }}
+          tage: "{{ ['Mo','Di','Mi','Do','Fr','Sa','So'] }}"
+      - if: "{{ titel in ['', 'unknown'] }}"
+        then:
+          - action: input_text.set_value
+            target: { entity_id: input_text.familienplaner_status }
+            data: { value: "⚠️ Bitte zuerst einen Titel eingeben." }
+          - stop: Kein Titel
+      - if: "{{ datum in ['', 'unknown', 'unavailable'] }}"
+        then:
+          - action: input_text.set_value
+            target: { entity_id: input_text.familienplaner_status }
+            data: { value: "⚠️ Bitte ein Datum wählen." }
+          - stop: Kein Datum
+      - if: "{{ ganztags }}"
+        then:
+          - action: calendar.create_event
+            target: { entity_id: "{{ kalender }}" }
+            data:
+              summary: "{{ titel }}"
+              start_date: "{{ datum }}"
+              end_date: "{{ (as_datetime(datum) + timedelta(days=1)).date() }}"
+              location: "{{ ort }}"
+        else:
+          - action: calendar.create_event
+            target: { entity_id: "{{ kalender }}" }
+            data:
+              summary: "{{ titel }}"
+              start_date_time: "{{ datum }} {{ von }}:00"
+              end_date_time: "{{ datum }} {{ bis }}:00"
+              location: "{{ ort }}"
+      - action: input_text.set_value
+        target: { entity_id: input_text.familienplaner_status }
+        data:
+          value: >
+            ✅ „{{ titel }}“ eingetragen – {{ tage[as_datetime(datum).weekday()] }}, {{ as_datetime(datum).strftime('%d.%m.') }}
+            {%- if not ganztags %} um {{ von }} Uhr{% endif %} ({{ states('input_select.familienplaner_termin_kalender') }})
+      - action: input_text.set_value
+        target: { entity_id: [input_text.familienplaner_termin_titel, input_text.familienplaner_termin_ort] }
+        data: { value: "" }
+
+  familienplaner_essen_speichern:
+    alias: Familienplaner – Essen eintragen
+    icon: mdi:pot-steam
+    mode: single
+    sequence:
+      # kurz warten, bis das zuletzt getippte Textfeld am Tablet uebernommen ist
+      - delay: "00:00:00.700"
+      - variables:
+          gericht: "{{ states('input_text.familienplaner_essen_gericht') | trim }}"
+          datum: "{{ states('input_datetime.familienplaner_essen_datum') }}"
+          mahlzeit: "{{ states('input_select.familienplaner_essen_mahlzeit') }}"
+          tage: "{{ ['Mo','Di','Mi','Do','Fr','Sa','So'] }}"
+      - if: "{{ gericht in ['', 'unknown'] }}"
+        then:
+          - action: input_text.set_value
+            target: { entity_id: input_text.familienplaner_status }
+            data: { value: "⚠️ Bitte zuerst ein Gericht eingeben." }
+          - stop: Kein Gericht
+      - action: calendar.create_event
+        target: { entity_id: calendar.essensplan }
+        data:
+          summary: >
+            {{ gericht if mahlzeit == 'Abendessen' else mahlzeit ~ ': ' ~ gericht }}
+          start_date: "{{ datum }}"
+          end_date: "{{ (as_datetime(datum) + timedelta(days=1)).date() }}"
+      - action: input_text.set_value
+        target: { entity_id: input_text.familienplaner_status }
+        data:
+          value: "✅ {{ gericht }} – {{ tage[as_datetime(datum).weekday()] }}, {{ as_datetime(datum).strftime('%d.%m.') }} – weiter mit dem nächsten Tag!"
+      - action: input_text.set_value
+        target: { entity_id: input_text.familienplaner_essen_gericht }
+        data: { value: "" }
+      # direkt zum naechsten Tag springen -> Woche am Stueck planen
+      - action: input_datetime.set_datetime
+        target: { entity_id: input_datetime.familienplaner_essen_datum }
+        data:
+          date: "{{ (as_datetime(datum) + timedelta(days=1)).date() }}"
+
+automation:
+  - id: familienplaner_eingabe_auf_heute
+    alias: Familienplaner – Eingabefelder auf heute setzen
+    mode: single
+    triggers:
+      - trigger: time
+        at: "00:01:00"
+      - trigger: homeassistant
+        event: start
+    actions:
+      - action: input_datetime.set_datetime
+        target: { entity_id: [input_datetime.familienplaner_termin_datum, input_datetime.familienplaner_essen_datum] }
+        data: { date: "{{ now().date() }}" }
+      - if: "{{ states('input_datetime.familienplaner_termin_von') in ['unknown', '00:00:00'] }}"
+        then:
+          - action: input_datetime.set_datetime
+            target: { entity_id: input_datetime.familienplaner_termin_von }
+            data: { time: "16:00:00" }
+          - action: input_datetime.set_datetime
+            target: { entity_id: input_datetime.familienplaner_termin_bis }
+            data: { time: "17:00:00" }
+      # Frische Installation: leere Textfelder zeigen sonst „unknown“
+      - repeat:
+          for_each: [input_text.familienplaner_termin_titel, input_text.familienplaner_termin_ort, input_text.familienplaner_essen_gericht]
+          sequence:
+            - if: "{{ states(repeat.item) in ['unknown', 'unavailable'] }}"
+              then:
+                - action: input_text.set_value
+                  target: { entity_id: "{{ repeat.item }}" }
+                  data: { value: "" }
+
+  - id: familienplaner_status_aufraeumen
+    alias: Familienplaner – Statusmeldung ausblenden
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_text.familienplaner_status
+        for: "00:00:20"
+    conditions:
+      - condition: template
+        value_template: "{{ trigger.to_state.state != '' }}"
+    actions:
+      - action: input_text.set_value
+        target: { entity_id: input_text.familienplaner_status }
+        data: { value: "" }
