@@ -244,6 +244,42 @@ views:
   - type: custom:mushroom-chips-card
     alignment: start
     chips:
+    # erscheint erst, wenn das Paket aus Teil 2 installiert ist
+    - type: conditional
+      conditions:
+      - entity: script.familienplaner_liste_drucken
+        state_not: unavailable
+      chip:
+        type: template
+        icon: mdi:printer
+        icon_color: teal
+        content: Aufgaben drucken
+        tap_action:
+          action: perform-action
+          perform_action: script.familienplaner_liste_drucken
+          data:
+            liste: aufgaben
+            status: input_text.familienplaner_status
+          confirmation:
+            text: Aufgaben jetzt ausdrucken?
+    # erscheint erst, wenn das Paket aus Teil 2 installiert ist
+    - type: conditional
+      conditions:
+      - entity: script.familienplaner_liste_senden
+        state_not: unavailable
+      chip:
+        type: template
+        icon: mdi:send
+        icon_color: blue
+        content: Aufgaben per Telegram
+        tap_action:
+          action: perform-action
+          perform_action: script.familienplaner_liste_senden
+          data:
+            liste: aufgaben
+            status: input_text.familienplaner_status
+          confirmation:
+            text: Aufgaben jetzt per Telegram schicken?
     - type: conditional
       conditions:
       - entity: input_text.familienplaner_status
@@ -379,6 +415,49 @@ views:
         ha-card$: '.card-header { font-size: 22px !important; padding-bottom: 4px !important; }'
     view_layout:
       grid-area: shop
+  - type: custom:mushroom-chips-card
+    alignment: justify
+    chips:
+    # erscheint erst, wenn das Paket aus Teil 2 installiert ist
+    - type: conditional
+      conditions:
+      - entity: script.familienplaner_liste_drucken
+        state_not: unavailable
+      chip:
+        type: template
+        icon: mdi:printer
+        icon_color: teal
+        content: Drucken
+        tap_action:
+          action: perform-action
+          perform_action: script.familienplaner_liste_drucken
+          data:
+            liste: einkauf
+            status: input_text.familienplaner_status
+          confirmation:
+            text: Einkaufsliste jetzt ausdrucken?
+    # erscheint erst, wenn das Paket aus Teil 2 installiert ist
+    - type: conditional
+      conditions:
+      - entity: script.familienplaner_liste_senden
+        state_not: unavailable
+      chip:
+        type: template
+        icon: mdi:send
+        icon_color: blue
+        content: Telegram
+        tap_action:
+          action: perform-action
+          perform_action: script.familienplaner_liste_senden
+          data:
+            liste: einkauf
+            status: input_text.familienplaner_status
+          confirmation:
+            text: Einkaufsliste jetzt per Telegram schicken?
+    card_mod:
+      style: 'ha-card { --chip-height: 44px; --chip-font-size: 15px; --chip-icon-size: 20px; --chip-spacing: 10px; --chip-padding: 0 16px; }'
+    view_layout:
+      grid-area: shopbar
   - type: vertical-stack
     cards:
     - type: vertical-stack
